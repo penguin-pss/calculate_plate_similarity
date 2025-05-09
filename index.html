@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>車牌相似度計算器</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+    <style>
+        body {
+            font-family: "Helvetica", sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        input {
+            padding: 10px;
+            margin: 10px;
+            font-size: 18px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 24px;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>車牌相似度計算器</h1>
+    <input id="plate1" type="text" placeholder="輸入車牌1" />
+    <input id="plate2" type="text" placeholder="輸入車牌2" />
+    <br>
+    <button onclick="calculate()">計算相似度</button>
+    <div id="result"></div>
+
+    <script>
+        const pythonCode = `
+from Levenshtein import distance
+
+def _char_similarity(char1, char2):
+    """車牌字符相似性分數定義"""
+    similar_chars = {
+        ('0', 'O'): 0.8, ('I', '1'): 0.8, ('6', '8'): 0.7,
+        ('B', '8'): 0.7, ('5', 'S'): 0.6, ('Z', '2'): 0.5,
+        ('G', '9'): 0.5, ('C', 'O'): 0.4
+    }
+    if (char1, char2) in similar_chars:
+        return similar_chars[(char1, char2)]
+    elif (char2, char1) in similar_chars:
+        return similar_chars[(char2, char1)]
+    elif char1 == char2:
+        return 1.0
+    return 0.0
+
+def _calculate_plate_similarity(plate1, plate2):
+    """車牌相似性計算方法"""
+    dist = distance(plate1, plate2)
+    max_len = max(len(plate1), len(plate2))
+    base_similarity = 1 - dist / max_len
+
+    if len(plate1) == len(plate2):
+        similarity_adjustment = 0
+        for i in range(len(plate1)):
+            if plate1[i] != plate2[i]:
+                similarity_adjustment += _char_similarity(plate1[i], plate2[i])
+        adjusted_similarity = base_similarity + (similarity_adjustment / len(plate1))
+        return min(adjusted_similarity, 1.0)
+    else:
+        return base_similarity
+`;
+
+        async function loadPyodideAndPackages() {
+            window.pyodide = await loadPyodide();
+            await pyodide.loadPackage("micropip");
+            await pyodide.runPythonAsync(`
+                import micropip
+                await micropip.install("python-Levenshtein")
+            `);
+            await pyodide.runPythonAsync(pythonCode);
+        }
+
+        async function calculate() {
+            const plate1 = document.getElementById("plate1").value.trim();
+            const plate2 = document.getElementById("plate2").value.trim();
+            try {
+                const code = `_calculate_plate_similarity("${plate1}", "${plate2}")`;
+                const result = await pyodide.runPythonAsync(code);
+                document.getElementById("result").textContent = "相似度分數為：" + (result * 100).toFixed(2) + "%";
+            } catch (e) {
+                document.getElementById("result").textContent = "錯誤：" + e;
+            }
+        }
+
+        loadPyodideAndPackages();
+    </script>
+</body>
+</html>
