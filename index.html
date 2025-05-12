@@ -1,45 +1,114 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <title>車牌相似度計算器</title>
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
-    <style>
-        body {
-            font-family: "Helvetica", sans-serif;
-            text-align: center;
-            margin-top: 50px;
-        }
-        input {
-            padding: 10px;
-            margin: 10px;
-            font-size: 18px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 18px;
-        }
-        #result {
-            margin-top: 20px;
-            font-size: 24px;
-            color: green;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>逃票系統(fefm)-車牌相似度計算器</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Helvetica, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .spinner {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #3498db;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .container {
+      display: none; /* 預設隱藏，等 Python 載入完才顯示 */
+      background: #ffffff;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 24px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+      text-transform: uppercase;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 18px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #218838;
+    }
+
+    #result {
+      margin-top: 20px;
+      font-size: 22px;
+      color: #006400;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-    <h1>車牌相似度計算器</h1>
+
+  <!-- 載入動畫 -->
+  <div class="loader" id="loading">
+    <div class="spinner"></div>
+    <div>套件載入中，請稍候...</div>
+  </div>
+
+  <!-- 主內容 -->
+  <div class="container" id="main">
+    <h1>逃票系統(fefm)-車牌相似度計算器</h1>
     <input id="plate1" type="text" placeholder="輸入車牌1" />
     <input id="plate2" type="text" placeholder="輸入車牌2" />
-    <br>
     <button onclick="calculate()">計算相似度</button>
     <div id="result"></div>
+  </div>
 
-    <script>
-        const pythonCode = `
+  <script>
+    const pythonCode = `
 import textdistance
 
 def _char_similarity(char1, char2):
-    """車牌字符相似性分數定義"""
     similar_chars = {
         ('0', 'O'): 0.8, ('I', '1'): 0.8, ('6', '8'): 0.7,
         ('B', '8'): 0.7, ('5', 'S'): 0.6, ('Z', '2'): 0.5,
@@ -54,7 +123,6 @@ def _char_similarity(char1, char2):
     return 0.0
 
 def _calculate_plate_similarity(plate1, plate2):
-    """車牌相似性計算方法"""
     dist = textdistance.levenshtein.distance(plate1, plate2)
     max_len = max(len(plate1), len(plate2))
     base_similarity = 1 - dist / max_len if max_len > 0 else 1.0
@@ -70,31 +138,62 @@ def _calculate_plate_similarity(plate1, plate2):
         return base_similarity
 `;
 
-        let pyodide = null;
+    let pyodide = null;
 
-        async function loadPyodideAndPackages() {
-            pyodide = await loadPyodide();
-            await pyodide.loadPackage("micropip");
-            await pyodide.runPythonAsync(`
+    async function loadPyodideAndPackages() {
+      pyodide = await loadPyodide();
+      await pyodide.loadPackage("micropip");
+      await pyodide.runPythonAsync(`
 import micropip
 await micropip.install("textdistance")
-            `);
-            await pyodide.runPythonAsync(pythonCode);
-        }
+      `);
+      await pyodide.runPythonAsync(pythonCode);
 
-        async function calculate() {
-            const plate1 = document.getElementById("plate1").value.trim();
-            const plate2 = document.getElementById("plate2").value.trim();
-            try {
-                const code = `_calculate_plate_similarity("${plate1}", "${plate2}")`;
-                const result = await pyodide.runPythonAsync(code);
-                document.getElementById("result").textContent = "相似度分數為：" + (result * 100).toFixed(2) + "%";
-            } catch (e) {
-                document.getElementById("result").textContent = "錯誤：" + e;
-            }
-        }
+      // 隱藏 loading 畫面，顯示主內容
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("main").style.display = "block";
+    }
 
-        loadPyodideAndPackages();
-    </script>
+    async function calculate() {
+      const plate1 = document.getElementById("plate1").value.trim();
+      const plate2 = document.getElementById("plate2").value.trim();
+      try {
+        const code = `_calculate_plate_similarity("${plate1}", "${plate2}")`;
+        const result = await pyodide.runPythonAsync(code);
+        document.getElementById("result").textContent = "相似度分數為：" + result.toFixed(4);
+      } catch (e) {
+        document.getElementById("result").textContent = "錯誤：" + e;
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const plate1 = document.getElementById("plate1");
+      const plate2 = document.getElementById("plate2");
+
+      plate1.addEventListener("input", () => {
+        plate1.value = plate1.value.toUpperCase();
+      });
+
+      plate2.addEventListener("input", () => {
+        plate2.value = plate2.value.toUpperCase();
+      });
+
+      plate1.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          plate2.focus();
+        }
+      });
+
+      plate2.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          calculate();
+        }
+      });
+    });
+
+    loadPyodideAndPackages();
+  </script>
 </body>
 </html>
